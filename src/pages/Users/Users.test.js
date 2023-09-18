@@ -1,10 +1,19 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-
-import Users from '.';
 import { QueryClient, QueryClientProvider } from 'react-query';
+import { useUsersQuery } from '../../services/useUsersQuery';
 import { BrowserRouter } from 'react-router-dom';
+import Users from '.';
+import { render, screen } from '@testing-library/react';
 
-const queryClient = new QueryClient();
+const mockUseUsersQuery = useUsersQuery;
+jest.mock('../../services/useUsersQuery');
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: false,
+    },
+  },
+});
 
 const wrapper = ({ children }) => (
   <QueryClientProvider client={queryClient}>
@@ -12,20 +21,51 @@ const wrapper = ({ children }) => (
   </QueryClientProvider>
 );
 
-test('users page', async () => {
-  render(<Users />, { wrapper });
+describe('users page', () => {
+  it('display loading view', () => {
+    mockUseUsersQuery.mockImplementation(() => ({
+      status: 'loading',
+    }));
 
-  const linkElement2 = screen.getByText(/back to home/i);
-  expect(linkElement2).toBeInTheDocument();
-
-  waitFor(() => {
-    fireEvent.click(linkElement2);
-
-    const linkElement3 = screen.getByText(/go to users page/i);
-    expect(linkElement3).toBeInTheDocument();
+    render(<Users />, { wrapper });
+    expect(screen.getByTestId('users-loading')).toBeInTheDocument();
   });
 
-  await waitFor(() => {
-    expect(screen.getByTestId(/user-1/i)).toBeInTheDocument();
+  it('display error view', () => {
+    mockUseUsersQuery.mockImplementation(() => ({
+      status: 'error',
+    }));
+
+    render(<Users />, { wrapper });
+    expect(screen.getByTestId('users-error')).toBeInTheDocument();
+  });
+
+  it('display success view', () => {
+    mockUseUsersQuery.mockImplementation(() => ({
+      status: 'success',
+      data: [
+        {
+          id: 1,
+          name: 'John Doe',
+        },
+        {
+          id: 2,
+          name: 'Jane Doe',
+        },
+      ],
+    }));
+
+    render(<Users />, { wrapper });
+    expect(screen.getByTestId('user-0')).toBeInTheDocument();
+  });
+
+  it('display empty view', () => {
+    mockUseUsersQuery.mockImplementation(() => ({
+      status: 'success',
+      data: [],
+    }));
+
+    render(<Users />, { wrapper });
+    expect(screen.getByTestId('users-null')).toBeInTheDocument();
   });
 });
